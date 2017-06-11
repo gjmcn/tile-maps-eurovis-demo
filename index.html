@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Make a Tile Map</title>
+  <link href='index.css' rel='stylesheet'/>
+  <script src='concaveman-bundle.js'></script>
+  <script src='jquery-2.2.2.min.js'></script>
+  <script src='numeric-1.2.6.min.js'></script>
+  <script src='L2-flot.js'></script>
+  <script src='L2-html.js'></script>
+  <script src='L2-print.js'></script>
+  <script src='index-bundle.js'></script>
+</head>
+
+<body>
+<div id="cont">
+
+   <div id="control">
+    <h1>Make a Tile Map</h1>
+    <form id="option_form" action="" onsubmit="return false;">
+      <div class="select">
+        <label class='more-info' title='Mainland regions only.'>Map</label>
+        <select id="geo">
+          <option value="africa-country">Africa - country (50)</option>
+          <option value="china-prefecture">China - prefecture (339)</option>
+          <option value="france-department">France - department (94)</option>
+          <option value="uk-london-borough" >UK, London - bourough (33)</option>
+          <option value="uk-local-authority">UK - local authority (374)</option>
+          <option value="uk-constit">UK - constituency (628)</option>
+          <option value="usa-state" selected>USA - state (49)</option>
+          <option value="usa-california-county">USA, California - county (58)</option>
+        </select>
+      </div>
+      <div class="select">
+        <label>Tile shape</label>
+        <select id="shape">
+          <option value="sq" selected>square</option>
+          <option value="hex-side">hexagon - flat side</option>
+          <option value="hex-base">hexagon - flat base</option>
+          <option value="tri-side">triangle - flat side</option>
+          <option value="tri-base">triangle - flat base</option>
+        </select>
+      </div>
+      <hr>
+      <p class="bold">Options: experimental</p>
+      <div class="text">
+        <label class='more-info' title="During centroid transformation, repel non-neighbors that are currently less than a grid step away.">Repel non-neighbors</label>
+        <input type="checkbox" id="repel" name="repel_input" checked></input>
+      </div>
+      <div class="text">
+        <label class='more-info' title="If zero, 'drag' boundary along with centroids.  Otherwise, use concave hull of transformed centroids: 1 for detailed shape, Infinity for convex hull. Concave hull is fitted to enlarged centroids so the hull cannot be within half a grid step of a centroid.">Boundary transformation</label>
+        <input id="concav" name="concav_input" type="text" value="1"></input>
+      </div>
+      <hr>
+      <p class="bold">Options: multiple values permitted, all permutations used</p>
+      <div class="text">
+        <label class='more-info' title="Comma separated list of non-negative numbers. Standard deviation of the centroid noise; specified as a proportion of the mean distance of a centroid from its neighbors.">Noise</label>
+        <input id="noise" name="noise_input" class="option" type="text" value="0, 0.05, 0.1"></input>
+        <!--<input id="noise" name="noise_input" class="option" type="text" value="0"></input>-->
+      </div>
+      <div class="text">
+        <label class='more-info' title="Comma separated list of numbers. Values typically between 0 (no centroid displacement) and 1 (move centroids to be as evenly spaced as possible whilst retaining angular relationships). Can use value greater than 1 for exaggerated transformation or less than 0 for ~inverse transformation.">Transform</label>
+        <input id="displace" name="displace_input" class="option" type="text" value="0, 0.6, 0.9, 1"></input>
+        <!--<input id="displace" name="displace_input" class="option" type="text" value="1"></input>-->
+      </div>
+      <div class="text">
+        <label class='more-info' title="Comma separated list of non-negative integers. Number of radial basis functions used to smooth the boundary; 0 for no smoothing.">Smooth</label>
+        <input id="smooth" name="smooth_input" class="option" type="text" value="0, 40, 20"></input>
+        <!--<input id="smooth" name="smooth_input" class="option" type="text" value="0"></input>-->
+      </div>
+      <div class="text">
+        <label class='more-info' title="Comma separated list of values in {none, x, y, xy}. Direction in which to shift the grid before fitting tiles to the boundary.">Shift</label>
+        <input id="shift" name="shift_input" class="option" type="text" value="none, x, y, xy"></input>
+        <!--<input id="shift" name="shift_input" class="option" type="text" value="none"></input>-->
+      </div>
+      <div class="info">Number of tile maps: 
+        <span id="grid_count" class="bold"></span>
+      </div>
+      <hr>
+      <div class="text">
+        <label title="Maximum number of maps to show.">Show tile maps (max)</label>
+        <input id="max" name="max_input" type="text" value="20"></input>
+      </div>
+      <div class="button">
+        <button type="submit">Create Tile Maps</button>
+      </div>
+    </form>
+  </div>      
+
+  <div id="plot_wrap" class="plot">
+    <div id="param_wrap">
+      <p>
+        <span class="bold">Top <span id="tile_maps_shown"></span> tile maps. Adjust the weights to rerank the maps or click on a map for more details.</span><br>
+      </p>
+      <hr>
+      <form id="param_form" action="" onsubmit="return false;">
+        <p class="bold no_top_margin">Cost Weights</p>
+        <div class="range">
+          <label class='more-info' title="Mean distance (in grid steps) between transformed centroids and tile centroids.">Distance</label>
+          <input id="distance" name="distance_input" class="param" type="range" min="0" max="10" value="1" step="0.1" 
+                 oninput="distance_output.value = distance_input.value"></input>
+          <output id="distance_out" name="distance_output" class="param_output"></output>
+        </div>
+        <div class="range">
+          <label class='more-info' title="Mean angle error between pairs of neighboring regions; normalized to lie in [0,1].">Angle</label>
+          <input id="angle" name="angle_input" class="param" type="range" min="0" max="10" value="1" step="0.1"
+                 oninput="angle_output.value = angle_input.value"></input>
+          <output id="angle_out" name="angle_output" class="param_output"></output>
+        </div>
+        <div class="range">
+          <label class='more-info' title="Proportion of adjacencies that are not preserved.">Adjacency</label>
+          <input id="adjacency" name="adjacency_input" class="param" type="range" min="0" max="10" value="1" step="0.1"
+                 oninput="adjacency_output.value = adjacency_input.value"></input>
+          <output id="adjacency_out" name="adjacency_output" class="param_output"></output>
+        </div>
+        <div class="range">
+          <label class='more-info' title="Roughness of the tile map. Approximately, the difference between the perimeter of the the tile map and the perimeter of a circle with the same area as the tile map. The value is normalized by dividing by the perimeter of the circle.">Rough</label>
+          <input id="rough" name="rough_input" class="param" type="range" min="0" max="10" value="1" step="0.1"
+                 oninput="rough_output.value = rough_input.value"></input>
+          <output id="rough_out" name="rough_output" class="param_output"></output>
+        </div>
+        <div id="rerank" class="button">
+          <button type="submit">Rank Maps</button>
+        </div>
+      </form>
+      <div id="plot_cost"></div>
+      <hr class="clear_both">
+      <button type="button" id="circle">Plot as circles</button>
+      <div id="norm_msg" class="small">(costs are normalized on each map: white&mdash;lowest, red&mdash;highest)</div>
+    </div>
+    <div id="plot_main"></div>
+  </div>
+  
+  <div id="mask"></div>
+  <div id="detail_wrap">
+    <button id="close_detail">Close</button>
+    <div id="detail_option"></div>
+    <form id="detail_form" action="" onsubmit="return false;">
+      <label><input type="radio" name="map_choice" value="orig_map" id="orig" checked>Original map</label>
+      <label><input type="radio" name="map_choice" value="adjacency">Adjacency</label>
+      <label><input type="radio" name="map_choice" value="displace">Transformation</label>
+      <label><input type="radio" name="map_choice" value="displace_only">Transformed Map</label>
+      <label><input type="radio" name="map_choice" value="grid">Tiles</label>
+      <label><input type="radio" name="map_choice" value="tile_map">Tile map</label>
+    </form>
+    <form id="cost_show_form" action="" onsubmit="return false;">
+      <label><input type="radio" name="cost_choice" value="total" checked>Total cost</label>
+      <label><input type="radio" name="cost_choice" value="distance">Distance</label>
+      <label><input type="radio" name="cost_choice" value="angle">Angle</label>
+      <label><input type="radio" name="cost_choice" value="adjacency">Adjacency</label>
+      <label><input type="radio" name="cost_choice" value="">None</label>
+    </form>
+    <div id='detail'></div>
+  </div>
+  <div id="busy">Creating tile maps ...</div>
+
+</div>
+</body>
+</html>
